@@ -18,18 +18,44 @@ using namespace std;
 int _tmain(int argc, _TCHAR* argv[])
 {
 	labColor::init();
+	/*
+	int maxL = -10000,maxA = -10000,maxB = -10000;
+	int minL =  10000,minA =  10000,minB =  10000;
+
+	for (int r = 0; r <= 255; r++)
+		for (int g = 0; g <= 255; g++)
+			for (int b = 0; b <= 255; b++)
+			{
+				labColor lab(r,g,b,0);
+				
+				maxL = max(lab.l,maxL);
+				maxA = max(lab.a, maxA);
+				maxB = max(lab.b, maxB);
+
+				minL = min(lab.l, minL);
+				minA = min(lab.a, minA);
+				minB = min(lab.b, minB);
+			}
+
+	cout << minL << " " << maxL << endl;
+	cout << minA << " " << maxA << endl;
+	cout << minB << " " << maxB << endl;
+
+	system("PAUSE");
+	return 0;
+	*/
 	vector<colorMap> db;
 	vector<colorMap> target;
 	
-	for (int i = 1; i <= 20; i++)
+	for (int i = 1; i <= 100; i++)
 	{
-		db.push_back(colorMap(string("testImage\\") + to_string(i) + string(".jpg"), true));
-		cout << i << "loaded" << endl;
+		db.push_back(colorMap(string("image\\") + to_string(i) + string(".jpg"), true));
+		cout << i << " loaded" << endl;
 	}
 
-	for (int i = 1; i <= 17; i++)
+	for (int i = 1; i <= 30; i++)
 	{
-		target.push_back(colorMap(string("targetImage\\target") + to_string(i) + string(".png"), false));
+		target.push_back(colorMap(string("target\\") + to_string(i) + string(".png"), false));
 		cout << "target" << i << "loaded" << endl;
 	}
 
@@ -102,7 +128,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 					result.push_back(pair<double, int>(db[j] - target[i], j));
 
-					cout << "diff	db" << i << " - " << "tager" << j << endl;
+					cout << "diff	target" << i << " - " << "db" << j << endl;
 				}
 
 				sort(result.begin(), result.end());
