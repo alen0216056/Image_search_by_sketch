@@ -152,11 +152,11 @@ colorMap::colorMap(string &img, bool intention) : fileName(img)
 	int gridHeight = rows / GRID + 1;
 	int gridSize = gridWidth*gridHeight;
 
-	vector<vector<vector<colorEntity> > > colorFreq(GRID, vector<vector<colorEntity> >(GRID, vector<colorEntity>(1080)));
+	vector<vector<vector<colorEntity> > > colorFreq(GRID, vector<vector<colorEntity> >(GRID, vector<colorEntity>(1274)));
 
 	for (int i = 0; i < GRID; i++)
 		for (int j = 0; j < GRID; j++)
-			for (int k = 0; k < 1080; k++)
+			for (int k = 0; k < 1274; k++)
 					colorFreq[i][j][k] = colorEntity(k);
 
 	for (int i = 0; i < rows; i++)
@@ -178,8 +178,8 @@ colorMap::colorMap(string &img, bool intention) : fileName(img)
 			sort(colorFreq[i][j].begin(), colorFreq[i][j].end());
 	
 
-	vector<vector<double> > cvTmp(1080, vector<double>(GRID*GRID, 0.0));
-	vector<bool> cvTmpEmpty(1080,true);
+	vector<vector<double> > cvTmp(1274, vector<double>(GRID*GRID, 0.0));
+	vector<bool> cvTmpEmpty(1274, true);
 
 	for (int i = 0; i < GRID; i++)
 		for (int j = 0; j < GRID; j++)
@@ -207,8 +207,8 @@ colorMap::colorMap(string &img, bool intention) : fileName(img)
 					last = c.freq;
 				}
 		}
-	
-	for (int i = 0; i < 1080; i++)
+
+	for (int i = 0; i < 1274; i++)
 	{
 		if (!cvTmpEmpty[i])
 			cv.push_back(colorWithMap(i,cvTmp[i]));
