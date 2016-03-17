@@ -5,7 +5,7 @@
 
 using namespace std;
 
-double simTable[1080][1080];
+double simTable[1274][1274];
 
 double diff(const labColor&lhs, const labColor&rhs)
 {
@@ -15,19 +15,21 @@ double diff(const labColor&lhs, const labColor&rhs)
 
 	int sum = dl*dl + da*da + db*db;
 
-	if (sum >= 6)
+	if (sum >= 24)
 		return 0.0;
-
-	return 1 - sqrt(sum) / sqrt(8.0);
+	
+	if ( sum <= 3 )
+		return 1.0;
+	return 1.0 - sqrt(sum) / sqrt(24.0);
 }
 
 void labColor::init()
 {
-	for (int i = 0; i < 1080; i++)
-		for (int j = 0; j < 1080; j++)
-		{
-			simTable[i][j] = diff(labColor(i) , labColor(j));
-		}
+	for (int i = 0; i < 1274; i++)
+		for (int j = 0; j < 1274; j++)
+			{
+				simTable[i][j] = diff(labColor(i) , labColor(j));
+			}
 }
 
 inline int min(int a, int b)
@@ -78,17 +80,50 @@ labColor::labColor(int _r, int _g, int _b)
 	_a = 500 * (f(x) - f(y));
 	_bb = 200 * (f(y) - f(z));
 
-	l = _l / number;
+	l = min(floor(_l / number),6);
+	a = min(floor((_a + (number/2))/ number) + 6,12);
+	b = min(floor((_bb + (number / 2)) / number) + 7, 13);
+}
 
-	a = min(floor((_a + (number/2))/ number)  + 15,29);
-	b = min(floor((_bb + (number / 2)) / number) + 6, 11);
+labColor::labColor(int _r, int _g, int _b,int test)
+{
+	const static double xn = 0.9515, yn = 1, zn = 1.0886;
+
+	//const static int lStep = 100 / number, aStep = 1000/number, bStep = 400/number;
+	//3*30*12
+	double rr, gg, bb;
+	rr = rgb2xyz((_r + 256) % 256);
+	gg = rgb2xyz((_g + 256) % 256);
+	bb = rgb2xyz((_b + 256) % 256);
+
+
+	double x, y, z;
+
+	x = 0.412453*rr + 0.357580*gg + 0.180423*bb;
+	y = 0.212671*rr + 0.715160*gg + 0.072169*bb;
+	z = 0.019334*rr + 0.119193*gg + 0.950227*bb;
+
+	x /= xn;
+	y /= yn;
+	z /= zn;
+
+	double _l, _a, _bb;
+
+	_l = 116 * f(y) - 16;
+	_a = 500 * (f(x) - f(y));
+	_bb = 200 * (f(y) - f(z));
+
+	l = _l;
+
+	a = _a;
+	b = _bb;
 }
 
 labColor::labColor(int n)
 {
-	l = n / (30*12);
-	a = n % (30*12) / 12;
-	b = n % 12;
+	l = n / (13*14);
+	a = n % (13*14) / 14;
+	b = n % 14;
 }
 
 double labColor::operator-(const labColor&rhs) const
@@ -98,7 +133,7 @@ double labColor::operator-(const labColor&rhs) const
 
 int labColor::toInt() const
 {
-	return l * 30*12 + a * 12 + b;
+	return l * 13*14 + a * 14 + b;
 }
 
 bool labColor::isDntCare(int _r, int _g, int _b)
@@ -108,6 +143,6 @@ bool labColor::isDntCare(int _r, int _g, int _b)
 
 ostream& operator<<(ostream &os, const labColor &rhs)
 {
-	os << "(" << rhs.l*34 + 16 << " " << (rhs.a-15)*34 << " " << (rhs.b-6)*34 << ")";
+	os << "(" << rhs.l*15 + 7 << " " << (rhs.a-6)*15 << " " << (rhs.b-7)*15 << ")";
 	return os;
 }

@@ -44,6 +44,8 @@ inline double max(double a, double b)
 
 inline double decayFunc(int n)
 {
+	if (n == 1)
+		return 0.5;
 	return pow(0.5, n);
 }
 

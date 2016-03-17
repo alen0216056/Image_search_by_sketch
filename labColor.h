@@ -8,9 +8,10 @@ class labColor
 {
 private:
 public:
-	const static int number = 34;
+	const static int number = 15;
 	int l, a, b;
 	labColor(int, int, int);
+	labColor(int, int, int,int);//test
 	labColor(int);
 	double operator-(const labColor&) const;
 	int toInt() const;
