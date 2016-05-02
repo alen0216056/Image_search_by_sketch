@@ -2,20 +2,29 @@
 #include "hsvColor.h"
 #include "cmath"
 
+#include <algorithm>
+using namespace std;
+
+double simTable[336][336];
+
 hsvColor::hsvColor(int _h, int _s, int _v)
 {
-	const static int hStep = 360 / 12;
+	const static int hStep = 360 / 20;
 	const static int sStep = 256 / 4;
 	const static int vStep = 256 / 4;
 
-	h = ((_h + 256) % 256 * 2 + hStep / 2) % 360 / hStep;
-	s = (_s + 256) % 256 / sStep;
-	v = (_v + 256) % 256 / vStep;
+	h = ((_h + 256) % 256 * 2 + hStep / 2) % 360;
+	s = (_s + 256) % 256;
+	v = (_v + 256) % 256;
 
-	if (s == 0 || v == 0)
-		h = 0;
-	if (h == 0 && v == 0)
-		s = 0;
+	bool gray = s < 10;
+
+	h /= hStep;
+	s /= sStep;
+	v /= vStep;
+
+	if ( gray )
+		h = 20;
 }
 
 hsvColor::hsvColor(int n)
@@ -25,55 +34,74 @@ hsvColor::hsvColor(int n)
 	v = n % 4;
 }
 
+void hsvColor::init()
+{
+	const static double PI = atan(1.0) * 4;
+	for (int i = 0; i < 336; i++)
+		for (int j = 0; j < 336; j++)
+		{
+			hsvColor ci(i), cj(j);
+			
+			bool ciGray = ci.h == 20;
+			bool cjGray = cj.h == 20;
+
+			double dh = min(abs(ci.h-cj.h),20-abs(ci.h-cj.h));
+			double ds = ci.s-cj.s; 
+			double dv = ci.v-cj.v;
+
+			if (ciGray != cjGray)
+				dh = max(ci.v,cj.v);
+			
+			if (dh < 3)
+				dh *= 0.6;
+			simTable[i][j] = sqrt(dh*dh+ds*ds+dv*dv)/sqrt(54);
+			/*
+			vector<double> myHsv = ci.real();
+			vector<double> tarHsv = cj.real()
+			double dx = myHsv[1] * cos(myHsv[0] * PI / 180.0) - tarHsv[1] * cos(tarHsv[0] * PI / 180.0);
+			double dy = myHsv[1] * sin(myHsv[0] * PI / 180.0) - tarHsv[1] * sin(tarHsv[0] * PI / 180.0);
+			simTable[i][j] = (1 / sqrt(5.0)) * sqrt(dh*dh + dx*dx + dy*dy);*/
+		}
+}
+
 int hsvColor::toInt() const
 {
 	return h * 16 + s * 4 + v;
 }
 
-vector<double> hsvColor::getHSV() const
+vector<double> hsvColor::real() const
 {
 	vector<double> res(3);
-	res[0] = h * 30.0;
+	res[0] = h * 18.0;
 	res[1] = 0.125 + s*0.25;
 	res[2] = 0.125 + v*0.25;
 
 	return res;
 }
 
+bool hsvColor::isHSVDntCare(int _h, int _s, int _v)
+{
+	return ((_h)+256) % 256 == 8 && ((_s)+256) % 256 == 64 && ((_v)+256) % 256 == 64;
+}
+
 double hsvColor::operator-(const hsvColor& rhs) const
 {
-	const static double PI = atan(1.0) * 4;
-
-	int i = this->toInt();
-	int j = rhs.toInt();
-
-	if (simTable[i][j] >= -1e-3)
-		return simTable[i][j];
-
-	vector<double> myHsv = getHSV();
-	vector<double> tarHsv = rhs.getHSV();
-
-	double dh = myHsv[2] - tarHsv[2];
-	double dx = myHsv[1] * cos(myHsv[0] * PI / 180.0) - tarHsv[1] * cos(tarHsv[0] * PI / 180.0);
-	double dy = myHsv[1] * sin(myHsv[0] * PI / 180.0) - tarHsv[1] * sin(tarHsv[0] * PI / 180.0);
-	double res = 1 - (1 / sqrt(5.0)) * sqrt(dh*dh + dx*dx + dy*dy);
-
-	return simTable[i][j] = res;
+	return simTable[this->toInt()][rhs.toInt()];
 }
 
-bool hsvColor::isDntCare(int _h, int _s, int _v)
+void hsvColor::print(ostream &out) const
 {
-	const static int h = 15, s = 256 / 4, v = 256 / 4;
-	return (abs((_h + 256) % 256 * 2 - h) <= 1) && (abs((_s + 256) % 256 - s) <= 1) && (abs((_v + 256) % 256 - v) <= 1);
+	vector<double>res = real();
+	out << "(" << res[0] << " " << res[1]*100 << " " << res[2]*100 << ")";
 }
 
-bool hsvColor::operator==(const hsvColor& rhs) const
+void hsvColor::save(ostream &file) const
 {
-	return *this - rhs >= 0.99;
+	file << h << " " << s << " " << v << endl;
 }
 
 ostream& operator<<(ostream &os, const hsvColor &rhs)
 {
-	os << "(" << rhs.h * 30 << "," << 12.5 + rhs.s*25.0 << "," << 12.5 + rhs.v*25.0 << ")";
+	rhs.print(os);
 	return os;
 }

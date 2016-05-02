@@ -3,7 +3,10 @@
 
 #include "stdafx.h"
 #include "colorMap.h"
-#include "labColor.h"
+#include "hsvColor.h"
+#include "grader.h"
+#include "database.h"
+#include "tester.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,33 +20,25 @@ using namespace std;
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-	labColor::init();
+	tester test(fstream("database\\db_save_prop", ios::in), fstream("database\\selectedList", ios::in));
+	cout << "loaded" << endl;
+
+	for (int i = 1; i <= 100; i++)
+	{
+		cout << i << " : " << endl;
+		test.test(colorMap("target-2016-04-26\\"+to_string(i)+".jpg.png"));
+	}
+
+	cout << test.getScore() << endl;
+	
 	/*
-	int maxL = -10000,maxA = -10000,maxB = -10000;
-	int minL =  10000,minA =  10000,minB =  10000;
-
-	for (int r = 0; r <= 255; r++)
-		for (int g = 0; g <= 255; g++)
-			for (int b = 0; b <= 255; b++)
-			{
-				labColor lab(r,g,b,0);
-				
-				maxL = max(lab.l,maxL);
-				maxA = max(lab.a, maxA);
-				maxB = max(lab.b, maxB);
-
-				minL = min(lab.l, minL);
-				minA = min(lab.a, minA);
-				minB = min(lab.b, minB);
-			}
-
-	cout << minL << " " << maxL << endl;
-	cout << minA << " " << maxA << endl;
-	cout << minB << " " << maxB << endl;
-
+	database db;
+	
+	db.insertDir("database");
+	db.save(fstream("database\\db_save_prop",ios::out));*/
 	system("PAUSE");
-	return 0;
-	*/
+	
+	/*hsvColor::init();
 	vector<colorMap> db;
 	vector<colorMap> target;
 	
@@ -51,9 +46,24 @@ int _tmain(int argc, _TCHAR* argv[])
 	{
 		db.push_back(colorMap(string("image\\") + to_string(i) + string(".jpg"), true));
 		cout << i << " loaded" << endl;
-	}
+		
+		for (int j = 0; j < 64; j++)
+		{
+			if (j % 8 == 0)
+				cout << endl;
 
-	for (int i = 1; i <= 30; i++)
+			double sum = 0;
+			for (auto c : db.back().cv)
+				sum += c.map[j];
+
+			printf("%.3f ",sum);
+			
+		}
+		
+	}
+	
+
+	for (int i = 40; i <= 43; i++)
 	{
 		target.push_back(colorMap(string("target\\") + to_string(i) + string(".png"), false));
 		cout << "target" << i << "loaded" << endl;
@@ -73,7 +83,7 @@ int _tmain(int argc, _TCHAR* argv[])
 			vector<fstream> dbFiles;
 			vector<fstream> tarFiles;
 			fstream logFile("log\\log.csv", ios::out);
-
+			grader grader("target\\ans.txt");
 			logFile << "map size" << endl;
 
 
@@ -87,7 +97,7 @@ int _tmain(int argc, _TCHAR* argv[])
 				db[i].printColors(dbFiles[i]);
 				dbFiles[i] << endl << endl << endl;
 				
-				cout << "db print colors	" << i << "/" << db.size() << endl;
+				cout << "db print colors	" << i+1 << "/" << db.size() << endl;
 			}
 
 			for (int i = 0; i < target.size(); i++)
@@ -99,7 +109,7 @@ int _tmain(int argc, _TCHAR* argv[])
 				target[i].printColors(tarFiles[i]);
 				tarFiles[i] << endl << endl << endl;
 
-				cout << "target print colors	" << i << "/" << target.size() << endl;
+				cout << "target print colors	" << i+1 << "/" << target.size() << endl;
 			}
 
 			logFile << endl << endl << endl;
@@ -120,18 +130,19 @@ int _tmain(int argc, _TCHAR* argv[])
 					dbFiles[j]  << "diff" << "," << iName << endl;
 					tarFiles[i] << "diff" << "," << jName << endl;
 
-					target[i].debugShow(db[j], tarFiles[i]);
-					db[j].debugShow(target[i], dbFiles[j]);
+					double tem = target[i].debugShow(db[j], tarFiles[i]);
+					//db[j].debugShow(target[i], dbFiles[j]);
 
 					tarFiles[i] << endl;
 					dbFiles[j] << endl;
 
-					result.push_back(pair<double, int>(db[j] - target[i], j));
+					result.push_back(pair<double, int>(tem, j));
 
 					cout << "diff	target" << i << " - " << "db" << j << endl;
 				}
 
-				sort(result.begin(), result.end());
+				sort(result.rbegin(), result.rend());
+				grader.update(result,i);
 
 				for (auto &p : result)
 				{
@@ -145,6 +156,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 			}
 
+			logFile << grader << endl;
 			logFile.close();
 
 			for (auto& file : dbFiles)
@@ -152,53 +164,7 @@ int _tmain(int argc, _TCHAR* argv[])
 				
 			cout << "log done" << endl;
 		}
-		/*else if (cmd.compare("map") == 0)
-		{
-			if (id > 0)
-				db[id - 1].printColors();
-			else if ( id < 0 )
-				target[-id-1].printColors();
-		}
-		else if (cmd.compare("diff") == 0)
-		{
-			int id2;
-			cin >> id2;
-			db[id - 1].debugShow(target[-id2-1]);
-		}
-		else if (cmd.compare("result") == 0)
-		{
-			vector<pair<double, int> > result;
-
-			for (int i = 0; i < db.size(); i++)
-			{
-				result.push_back(pair<double, int>(db[i] - target[-id - 1], i));
-				cout << "done " << i << " - tar[" << -id << "]" << endl;
-			}
-				
-
-			sort(result.begin(), result.end());
-
-			for (auto &p : result)
-				cout << p.second + 1 << " : " << p.first << endl;
-
-			db[result.back().second].show(string("result"));
-			
-		}
-		else if (cmd.compare("show") == 0)
-		{
-			if (id > 0)
-				db[id - 1].show(string("show"));
-			else if ( id < 0 )
-				target[-id-1].show(string("show"));
-		}
-		else if (cmd.compare("clear") == 0)
-		{
-			for (int i = 0; i < 40; i++)
-				puts("");
-		}
-		else if (cmd.compare("exit") == 0)
-			break;*/
-	}
+	}*/
 
 	return 0;
 }

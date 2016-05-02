@@ -1,11 +1,15 @@
 #include "stdafx.h"
+#include "grid.h"
 #include "colorMap.h"
-#include "labColor.h"
+#include "hsvColor.h"
+#include "constants.h"
 
 #include <map>
 #include <cmath>
 #include <iostream>
 #include <iomanip>
+#include <queue>
+#include <tuple>
 
 using namespace std;
 
@@ -37,180 +41,224 @@ inline int abs(int a)
 	return a > 0 ? a : -a;
 }
 
-inline double max(double a, double b)
+double max(double a, double b)
 {
 	return a > b ? a : b;
 }
 
-inline double decayFunc(int n)
+double min(double a, double b)
 {
-	if (n == 1)
-		return 0.5;
-	return pow(0.5, n);
-}
-
-void propagate(const vector<double> &ori, vector<double> &res, int c, int x, int y, int depth, int size)
-{
-	for (int i = x - depth; i <= x + depth; i++)
-	{
-		int rem = depth - abs(x - i);
-		if (rem == 0)
-		{
-			if (i >= 0 && i < size)
-				res[i*size + y] = max(res[i*size + y], ori[x*size + y] * decayFunc(abs(i - x)));
-				//res[i*size + y] += ori[x*size + y] * decayFunc(abs(i - x));
-		}
-		else
-		{
-			for (int j = y - rem; j <= y + rem; j++)
-				if (i < 0 || j < 0 || i >= size || j >= size)
-					continue;
-				else
-					res[i*size + j] = max(res[i*size + j],ori[x*size + y] * decayFunc(abs(i - x) + abs(j - y)));
-					//res[i*size + j] += ori[x*size + y] * decayFunc(abs(i - x) + abs(j - y));
-		}
-		
-	}
-}
-
-double inner_product(const vector<double>& x, const vector<double>& y, int size)
-{
-	double ans = 0.0;
-	for (int i = 0; i < size; i++)
-	{
-		ans += x[i] * y[i];
-	}
-	return ans;
+	return a < b ? a : b;
 }
 
 double colorMap::operator-(const colorMap& rhs) const
 {
-	double ans = 0.0;
+	grid<double> ans(GRID,GRID);
 
 	for (auto& i : cv)
 	{
-		labColor ci(i.color);
+		grid<double> tmp(GRID,GRID);
+		hsvColor ci(i.color);
 		for (auto& j : rhs.cv)
 		{
-			labColor cj(j.color);
-			if (ci-cj > 0.0)
-				ans += (ci-cj) * inner_product(i.map, j.map, 64);
+			hsvColor cj(j.color);
+
+			double rlv = (ci-cj) < 0.3? 1-(ci-cj) : 0;
+
+			if (rlv > 0.0)
+				tmp.max(i.gd.mul(j.gd)*rlv);
 		}
+		ans = ans + tmp;
 	}
 
-	return ans;
+	return ans.sum();
 }
 
-void colorMap::debugShow(const colorMap& rhs, ostream & out) const
+bool colorMap::operator< (const colorMap& rhs) const
 {
-	double ans = 0.0;
-	vector<pair<double, pair<const colorWithMap*, const colorWithMap*> > > debug;
+	if (cv.size() != rhs.cv.size())
+		return cv.size() < rhs.cv.size();
+
+	for (int i = 0; i < cv.size(); i++)
+		if ( cv[i] != rhs.cv[i] )
+			return cv[i] < rhs.cv[i];
+
+	return false;
+}
+
+bool colorMap::operator== (const colorMap& rhs) const
+{
+	for (auto& i : cv)
+		for (auto& j : rhs.cv)
+			if ( i != j )
+				return false;
+	return true;
+}
+
+double colorMap::debugShow(const colorMap& rhs, ostream & out) const
+{
+	grid<double> ans(GRID, GRID);
 
 	for (auto& i : cv)
 	{
-		labColor ci(i.color);
+		grid<double> tmp(GRID, GRID);
+		hsvColor ci(i.color);
 		for (auto& j : rhs.cv)
 		{
-			labColor cj(j.color);
-			double res = (ci - cj) * inner_product(i.map, j.map, 64);
-			if (ci - cj > 0.0 && res >= 0.01)
-				debug.push_back(pair<double, pair<const colorWithMap*, const colorWithMap*> >(res, pair<const colorWithMap*, const colorWithMap*>(&i, &j)));
-			if (ci - cj > 0.0)
-				ans += (ci - cj) * inner_product(i.map, j.map, 64);
+			hsvColor cj(j.color);
+
+			double rlv = (ci - cj) < 0.3 ? 1 - (ci - cj) : 0;
+			grid<double> tmp2(GRID,GRID);
+			if (rlv > 0.0)
+			{
+				tmp2 = i.gd.mul(j.gd);
+				tmp2 = tmp2 * rlv;
+				tmp.max(tmp2);
+				//tmp.max(i.gd*j.gd*rlv);
+			}
+			
+			if (rlv > 0.0)
+			{
+				out << ci << "," << cj << ", rlv = ," << rlv << endl;
+				out << tmp << endl;
+			}
+			else
+			{
+				out << ci << "," << cj << ", rlv = ," << ci-cj << endl;
+			}
 		}
+		ans = ans + tmp;
+
+		out << ci << endl;
+		out << tmp << endl;
 	}
-	
-	sort(debug.rbegin(), debug.rend());
 
-	for (auto &p : debug)
-	{
-		labColor i = p.second.first->color, j = p.second.second->color;
-		out << i << "," << j << ", => , " << (i - j) << " , * , " << inner_product(p.second.first->map, p.second.second->map, 64) << " , = , " << p.first << endl;
-	} 
+	out << "grid result" << endl;
 
-	out << "result , " << ans << endl;
+	out << ans << endl;
+
+	return ans.sum();
 }
 
-colorMap::colorMap(string &img, bool intention) : fileName(img)
+colorMap::colorMap(istream& file)
 {
-	const int GRID = 8;
-	const int INF = 1 << 30;
+	string line;
+
+	getline(file,line);
+	fileName = line;
+
+	getline(file,line);
+	istringstream is(line);
+
+	int color;
+	vector<double> v(GRID*GRID);
+
+	while (is >> color)
+	{
+		for (int i = 0; i < GRID*GRID; i++)
+			is >> v[i];
+		
+		cv.push_back(colorWithMap(color, v));
+	}
 	
-	src = cvLoadImage(img.c_str(), 1);
+		
+}
+
+
+colorMap::colorMap(string &img, bool intention, bool fill) : fileName(img)
+{
+	IplImage *src = cvLoadImage(img.c_str(), 1);
 	
 	if (src == NULL)
 	{
 		cout << img << " not found" << endl;
 		return;
 	}
-	//IplImage *hsv = toHSV(src);
-
+	IplImage *hsv = toHSV(src);
+	
 	int rows = src->height;
 	int cols = src->width;
 	int step = src->widthStep;
-	char *data = src->imageData;
+	char *data = hsv->imageData;
 
-	int gridWidth = cols / GRID + 1;
-	int gridHeight = rows / GRID + 1;
+	int gridWidth = ceil((double)cols / GRID);
+	int gridHeight = ceil((double)rows / GRID);
 	int gridSize = gridWidth*gridHeight;
 
-	vector<vector<vector<colorEntity> > > colorFreq(GRID, vector<vector<colorEntity> >(GRID, vector<colorEntity>(1274)));
+	vector<vector<colorEntity> > colorFreq(GRID*GRID, vector<colorEntity>(TOTAL_COLORS));
 
-	for (int i = 0; i < GRID; i++)
-		for (int j = 0; j < GRID; j++)
-			for (int k = 0; k < 1274; k++)
-					colorFreq[i][j][k] = colorEntity(k);
+	for (int i = 0; i < GRID*GRID; i++)
+		for (int j = 0; j < TOTAL_COLORS; j++)
+			colorFreq[i][j] = colorEntity(j);
 
 	for (int i = 0; i < rows; i++)
 		for (int j = 0; j < cols; j++)
 		{
-			int r, g, b;
-			b = data[i*step + 3 * j + 0];
-			g = data[i*step + 3 * j + 1];
-			r = data[i*step + 3 * j + 2];
+			int h, s, v;
+			h = data[i*step + 3 * j + 0];
+			s = data[i*step + 3 * j + 1];
+			v = data[i*step + 3 * j + 2];
 
-			labColor lab(r,g,b);
+			hsvColor hsv(h,s,v);
 			
-			if (intention || !labColor::isDntCare(r, g, b))
-				colorFreq[i / gridHeight][j / gridWidth][lab.toInt()].freq++;
+			if (intention || !hsvColor::isHSVDntCare(h, s, v))
+				colorFreq[(i / gridHeight)*GRID + j / gridWidth][hsv.toInt()].freq++;
 		}
 
-	for (int i = 0; i < GRID; i++)
-		for (int j = 0; j < GRID; j++)
-			sort(colorFreq[i][j].begin(), colorFreq[i][j].end());
+	for (int i = 0; i < GRID*GRID; i++)
+		sort(colorFreq[i].begin(), colorFreq[i].end());
 	
+	vector<vector<double> > cvTmp(TOTAL_COLORS, vector<double>(GRID*GRID, 0.0));
+	vector<bool> cvTmpEmpty(TOTAL_COLORS, true);
 
-	vector<vector<double> > cvTmp(1274, vector<double>(GRID*GRID, 0.0));
-	vector<bool> cvTmpEmpty(1274, true);
+	for (int i = 0; i < GRID*GRID; i++)
+	{
+		int cnt = 0;
 
-	for (int i = 0; i < GRID; i++)
-		for (int j = 0; j < GRID; j++)
+		if (intention)
 		{
-			int last = 1;
-			int cnt = 0;
-
-			for (colorEntity& c : colorFreq[i][j])
-				if (c.freq * 2 < last)
+			/*for (colorEntity& c : colorFreq[i])
+				if (c.freq <= 0.1*gridSize)
 					break;
 				else
 				{
-					last = c.freq;
-					cnt+=c.freq;
+					cvTmp[c.color][i] = 1;
+					cvTmpEmpty[c.color] = false;
 				}
-
-
-			for (colorEntity& c : colorFreq[i][j])
-				if (c.freq * 2 < last)
+			*/
+			int last = 1;
+			for (colorEntity& c : colorFreq[i])
+				if (c.freq * 2 < last || c.freq < gridSize*0.05)
 					break;
 				else
 				{
-					cvTmp[c.color][i * GRID + j] = intention ? (double)c.freq / cnt : 1.0;
+					cvTmp[c.color][i] = 1;
 					cvTmpEmpty[c.color] = false;
 					last = c.freq;
 				}
+			
 		}
+		else
+		{
+			
+			for (colorEntity& c : colorFreq[i])
+			{
+				if (c.freq <= 0)
+					break;
+				cnt += c.freq;
+			}
+			
+			for (colorEntity& c : colorFreq[i])
+			{
+				if ( c.freq <= 0 )
+					break;
+				cvTmp[c.color][i] = (double)c.freq / cnt;
+				cvTmpEmpty[c.color] = false;
+			}
+		}
+	}
 
-	for (int i = 0; i < 1274; i++)
+	for (int i = 0; i < TOTAL_COLORS; i++)
 	{
 		if (!cvTmpEmpty[i])
 			cv.push_back(colorWithMap(i,cvTmp[i]));
@@ -219,46 +267,74 @@ colorMap::colorMap(string &img, bool intention) : fileName(img)
 	//intention map
 	if (intention)
 	{
-		const int propDepth = 1;
+		double decay[] = {1,0.5};
+		for (auto &cm : cv)
+			cm.gd.propagate(INTENTION_PROPAGATE_DEPTH, decay);
+	}
+	else if (fill)
+	{
+		/*double decay[] = { 1, 0.5 };
+		for (auto &cm : cv)
+			cm.gd.propagate(INTENTION_PROPAGATE_DEPTH, decay);*/
+		
+		/*double penalty[] = {1,0,-0.5,-0.5};
+		for (int s = 0, S = cv.size(); s < S; s++)
+		{
+			//cv[s].gd.closedFill();
+			
+			for (int i = 0; i < GRID; i++)
+				for (int j = 0; j < GRID; j++)
+					if (cv[s].gd.get(i, j) == 0)
+					{
+						int nearest = cv[s].gd.findNearest(i, j, 3);
+						if (nearest <= 3)
+							cv[s].gd.set(i, j, penalty[nearest]);
+					}
+		}
+		/*
+		grid<double> sum(GRID*GRID);
+		
+		for (auto &gr : cv)
+		{
+			sum = sum + gr.gd;
+		}
 
-		vector<colorWithMap> tmp;
-		vector<double> clearMap(GRID*GRID, 0.0);
-
-		for (auto& map : cv)
-			tmp.push_back(colorWithMap(map.color, clearMap));
-
-		for (int i = 0; i < cv.size(); i++)
-			for (int j = 0; j < GRID; j++)
-				for (int k = 0; k < GRID; k++)
-					if (cv[i].map[j*GRID+k] > 0)
-						propagate(cv[i].map, tmp[i].map, cv[i].color, j, k, propDepth,GRID);	
-
-		cv = tmp;
+		for (auto &gr : cv)
+		{
+			for (int i = 0; i < GRID*GRID; i++)
+				if ( sum.get(i) > 0 )
+					gr.gd.set(i, gr.gd.get(i) / sum.get(i));
+		}*/
 	}
 	cvReleaseImage(&src);
 }
 
 void colorMap::show(string& title)
 {
-	src = cvLoadImage(fileName.c_str(), 1);
+	IplImage *src = cvLoadImage(fileName.c_str(), 1);
 	cvShowImage(title.c_str(), src);
 	cvWaitKey(0);
 	cvDestroyWindow(title.c_str());
 	cvReleaseImage(&src);
 }
 
-void colorMap::printColors(ostream& out)
+void colorMap::printColors(ostream& out) const
 {
 	for (auto& i : cv)
 	{
-		out << "color " << labColor(i.color) << endl;
+		out << "color " << hsvColor(i.color) << endl;
 
-		for (int j = 0; j < 8; j++)
-		{
-			for (int k = 0; k < 8; k++)
-				out << setprecision(3) << i.map[j * 8 + k] << ",";
-			out << endl;
-		}
-		out << endl;
+		out << i.gd << endl;
 	}
+}
+
+void colorMap::save(ostream& file) const
+{
+	file << fileName << endl;
+	for (auto& i : cv)
+	{
+		file << i.color << " ";
+		i.gd.save(file);
+	}
+	file << endl;
 }
